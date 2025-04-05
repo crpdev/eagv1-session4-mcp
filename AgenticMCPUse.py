@@ -54,17 +54,46 @@ async def main():
             args=["example2-3.py"]
         )
 
-        async with stdio_client(server_params) as (read, write):
+        # Create a Paint MCP server connection
+        print("Establishing connection to Paint MCP server...")
+        paint_server_params = StdioServerParameters(
+            command="python",
+            args=["paint_server.py"]
+        )
+
+        # Create a Gmail MCP server connection
+        print("Establishing connection to Gmail MCP server...")
+        gmail_server_params = StdioServerParameters(
+            command="python",
+            args=["gmail_server.py"]
+        )
+
+        async with stdio_client(server_params) as (read, write), \
+            stdio_client(paint_server_params) as (paint_read, paint_write), \
+            stdio_client(gmail_server_params) as (gmail_read, gmail_write):
+
             print("Connection established, creating session...")
-            async with ClientSession(read, write) as session:
+            async with ClientSession(read, write) as session, \
+                ClientSession(paint_read, paint_write) as paint_session, \
+                ClientSession(gmail_read, gmail_write) as gmail_session:
+                
                 print("Session created, initializing...")
                 await session.initialize()
+                await paint_session.initialize()
+                await gmail_session.initialize()
                 
                 # Get available tools
                 print("Requesting tool list...")
                 tools_result = await session.list_tools()
                 tools = tools_result.tools
-                print(f"Successfully retrieved {len(tools)} tools")
+
+                paint_tools_result = await paint_session.list_tools()
+                gmail_tools_result = await gmail_session.list_tools()
+                
+                paint_tools = paint_tools_result.tools
+                gmail_tools = gmail_tools_result.tools
+
+                print(f"Successfully retrieved {len(tools)} Math tools, {len(paint_tools)} Paint tools and {len(gmail_tools)} Gmail tools")
 
                 # Create system prompt with available tools
                 print("Creating system prompt...")
@@ -77,6 +106,60 @@ async def main():
                         print(f"First tool example: {tools[0]}")
                     
                     tools_description = []
+
+                    # Add Paint tools
+                    tools_description.append("PAINT TOOLS:")
+                    for i, tool in enumerate(paint_tools):
+                        try:
+                            # Get tool properties
+                            params = tool.inputSchema
+                            desc = getattr(tool, 'description', 'No description available')
+                            name = getattr(tool, 'name', f'tool_{i}')
+                            
+                            # Format the input schema in a more readable way
+                            if 'properties' in params:
+                                param_details = []
+                                for param_name, param_info in params['properties'].items():
+                                    param_type = param_info.get('type', 'unknown')
+                                    param_details.append(f"{param_name}: {param_type}")
+                                params_str = ', '.join(param_details)
+                            else:
+                                params_str = 'no parameters'
+
+                            tool_desc = f"{i+1}. {name}({params_str}) - {desc}"
+                            tools_description.append(tool_desc)
+                            print(f"Added description for Paint tool: {tool_desc}")
+                        except Exception as e:
+                            print(f"Error processing Paint tool {i}: {e}")
+                            tools_description.append(f"{i+1}. Error processing tool")
+                    
+                    # Add Gmail tools
+                    tools_description.append("\nGMAIL TOOLS:")
+                    for i, tool in enumerate(gmail_tools):
+                        try:
+                            # Get tool properties
+                            params = tool.inputSchema
+                            desc = getattr(tool, 'description', 'No description available')
+                            name = getattr(tool, 'name', f'tool_{i}')
+                            
+                            # Format the input schema in a more readable way
+                            if 'properties' in params:
+                                param_details = []
+                                for param_name, param_info in params['properties'].items():
+                                    param_type = param_info.get('type', 'unknown')
+                                    param_details.append(f"{param_name}: {param_type}")
+                                params_str = ', '.join(param_details)
+                            else:
+                                params_str = 'no parameters'
+
+                            tool_desc = f"{i+1}. {name}({params_str}) - {desc}"
+                            tools_description.append(tool_desc)
+                            print(f"Added description for Gmail tool: {tool_desc}")
+                        except Exception as e:
+                            print(f"Error processing Gmail tool {i}: {e}")
+                            tools_description.append(f"{i+1}. Error processing tool")
+
+
                     for i, tool in enumerate(tools):
                         try:
                             # Get tool properties
