@@ -259,7 +259,15 @@ async def add_text(text: str) -> dict:
         
         # Type the text
         logger.info(f"Typing text: '{text}'")
-        paint_window.type_keys(text)
+        # Use a different approach to type text with spaces
+        for char in text:
+            if char == ' ':
+                # For spaces, use the space key
+                paint_window.type_keys('{SPACE}')
+            else:
+                # For other characters, type them directly
+                paint_window.type_keys(char)
+            time.sleep(0.1)  # Small delay between characters
         time.sleep(0.5)
         
         # Click to exit text mode

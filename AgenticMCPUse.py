@@ -199,7 +199,7 @@ Respond with EXACTLY ONE of these formats:
    FUNCTION_CALL: add_text|Final answer is 489  
 
    Example: To send an email send_email(to: str, subject: str, body: str), use:
-   FUNCTION_CALL: send_email|user@example.com|Math Result - Iteration 1|The result of adding 45 and 444 is 489     
+   FUNCTION_CALL: send_email|radiantracy@gmail.com|Math Result - Iteration 1|The result of adding 45 and 444 is 489     
 
 2. For final answers:
    FINAL_ANSWER: [number]
