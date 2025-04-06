@@ -32,15 +32,47 @@ mcp = FastMCP("PaintController")
 # Global variable to store Paint application instance
 paint_app = None
 
+def ensure_paint_active():
+    """Ensure the Paint window is active and visible"""
+    global paint_app
+    if not paint_app:
+        logger.warning("Paint is not open. Please call open_paint first.")
+        return False
+    
+    try:
+        # Get the Paint window
+        paint_window = paint_app.window(class_name='MSPaintApp')
+        
+        # Check if the window is minimized and restore it if needed
+        if win32gui.IsIconic(paint_window.handle):
+            logger.info("Paint window is minimized, restoring it")
+            win32gui.ShowWindow(paint_window.handle, win32con.SW_RESTORE)
+            time.sleep(0.5)  # Wait for the window to be restored
+        
+        # Ensure the window is active and in the foreground
+        logger.info("Ensuring Paint window is active and in the foreground")
+        win32gui.SetForegroundWindow(paint_window.handle)
+        time.sleep(0.5)  # Wait for the window to become active
+        
+        # Bring the window to the top
+        logger.info("Bringing Paint window to the top")
+        win32gui.BringWindowToTop(paint_window.handle)
+        time.sleep(0.5)  # Wait for the window to be brought to the top
+        
+        return True
+    except Exception as e:
+        logger.error(f"Error ensuring Paint window is active: {str(e)}")
+        return False
+
 @mcp.tool()
 async def open_paint() -> dict:
-    """Open Microsoft Paint maximized on secondary monitor"""
+    """Open Microsoft Paint"""
     global paint_app
     logger.info("Tool called: open_paint()")
     try:
         logger.info("Starting Microsoft Paint application")
         paint_app = Application().start('mspaint.exe')
-        time.sleep(0.2)
+        time.sleep(1.5)  # Increased sleep time to ensure Paint is fully loaded
         
         # Get the Paint window
         logger.info("Getting Paint window")
@@ -50,27 +82,42 @@ async def open_paint() -> dict:
         primary_width = GetSystemMetrics(0)
         logger.info(f"Primary monitor width: {primary_width}")
         
-        # First move to secondary monitor without specifying size
-        logger.info("Moving Paint window to secondary monitor")
+        # Ensure the window is active and in the foreground
+        logger.info("Ensuring Paint window is active and in the foreground")
+        win32gui.SetForegroundWindow(paint_window.handle)
+        time.sleep(0.5)  # Wait for the window to become active
+        
+        # Bring the window to the top
+        logger.info("Bringing Paint window to the top")
+        win32gui.BringWindowToTop(paint_window.handle)
+        time.sleep(0.5)  # Wait for the window to be brought to the top
+        
+        # Set the window to be topmost temporarily to ensure it's visible
+        logger.info("Setting Paint window to be topmost temporarily")
         win32gui.SetWindowPos(
             paint_window.handle,
-            win32con.HWND_TOP,
-            primary_width + 1, 0,  # Position it on secondary monitor
-            0, 0,  # Let Windows handle the size
-            win32con.SWP_NOSIZE  # Don't change the size
+            win32con.HWND_TOPMOST,
+            0, 0, 0, 0,
+            win32con.SWP_NOMOVE | win32con.SWP_NOSIZE
         )
+        time.sleep(0.5)  # Wait for the window to be set as topmost
         
-        # Now maximize the window
-        logger.info("Maximizing Paint window")
-        win32gui.ShowWindow(paint_window.handle, win32con.SW_MAXIMIZE)
-        time.sleep(0.2)
+        # Set the window back to normal (not topmost)
+        logger.info("Setting Paint window back to normal")
+        win32gui.SetWindowPos(
+            paint_window.handle,
+            win32con.HWND_NOTOPMOST,
+            0, 0, 0, 0,
+            win32con.SWP_NOMOVE | win32con.SWP_NOSIZE
+        )
+        time.sleep(0.5)  # Wait for the window to be set back to normal
         
-        logger.info("Paint opened successfully on secondary monitor and maximized")
+        logger.info("Paint opened successfully")
         return {
             "content": [
                 TextContent(
                     type="text",
-                    text="Paint opened successfully on secondary monitor and maximized"
+                    text="Paint opened successfully"
                 )
             ]
         }
@@ -102,6 +149,18 @@ async def draw_rectangle(x1: int, y1: int, x2: int, y2: int) -> dict:
                 ]
             }
         
+        # Ensure Paint window is active and visible
+        if not ensure_paint_active():
+            logger.warning("Failed to ensure Paint window is active")
+            return {
+                "content": [
+                    TextContent(
+                        type="text",
+                        text="Failed to ensure Paint window is active"
+                    )
+                ]
+            }
+        
         # Get the Paint window
         logger.info("Getting Paint window")
         paint_window = paint_app.window(class_name='MSPaintApp')
@@ -110,26 +169,20 @@ async def draw_rectangle(x1: int, y1: int, x2: int, y2: int) -> dict:
         primary_width = GetSystemMetrics(0)
         logger.info(f"Primary monitor width: {primary_width}")
         
-        # Ensure Paint window is active
-        if not paint_window.has_focus():
-            logger.info("Setting focus to Paint window")
-            paint_window.set_focus()
-            time.sleep(0.2)
-        
         # Click on the Rectangle tool
         logger.info("Clicking on Rectangle tool")
-        paint_window.click_input(coords=(530, 82))
-        time.sleep(0.2)
+        paint_window.click_input(coords=(440, 65))
+        time.sleep(1)
         
         # Get the canvas area
         logger.info("Getting canvas area")
         canvas = paint_window.child_window(class_name='MSPaintView')
         
         # Draw rectangle
-        logger.info(f"Drawing rectangle from ({x1+2560}, {y1}) to ({x2+2560}, {y2})")
-        canvas.press_mouse_input(coords=(x1+2560, y1))
-        canvas.move_mouse_input(coords=(x2+2560, y2))
-        canvas.release_mouse_input(coords=(x2+2560, y2))
+        logger.info(f"Drawing rectangle from ({x1}, {y1}) to ({x2}, {y2})")
+        canvas.press_mouse_input(coords=(x1, y1))
+        canvas.move_mouse_input(coords=(x2, y2))
+        canvas.release_mouse_input(coords=(x2, y2))
         
         logger.info("Rectangle drawn successfully")
         return {
@@ -168,19 +221,25 @@ async def add_text(text: str) -> dict:
                 ]
             }
         
+        # Ensure Paint window is active and visible
+        if not ensure_paint_active():
+            logger.warning("Failed to ensure Paint window is active")
+            return {
+                "content": [
+                    TextContent(
+                        type="text",
+                        text="Failed to ensure Paint window is active"
+                    )
+                ]
+            }
+        
         # Get the Paint window
         logger.info("Getting Paint window")
         paint_window = paint_app.window(class_name='MSPaintApp')
         
-        # Ensure Paint window is active
-        if not paint_window.has_focus():
-            logger.info("Setting focus to Paint window")
-            paint_window.set_focus()
-            time.sleep(0.5)
-        
         # Click on the Text tool
         logger.info("Clicking on Text tool")
-        paint_window.click_input(coords=(528, 92))
+        paint_window.click_input(coords=(290, 72))
         time.sleep(0.5)
         
         # Get the canvas area
@@ -192,7 +251,6 @@ async def add_text(text: str) -> dict:
         paint_window.type_keys('t')
         time.sleep(0.5)
         paint_window.type_keys('x')
-        time.sleep(0.5)
         
         # Click where to start typing
         logger.info("Clicking where to start typing")
